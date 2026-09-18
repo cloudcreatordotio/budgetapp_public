@@ -8,7 +8,7 @@ GitHub accounts; every query is scoped to the signed-in user.
 Built with ASP.NET Core Blazor (.NET 10, Interactive Server render mode) and EF Core 10 on
 SQL Server. Configuration and secrets come from Azure Key Vault in connected environments.
 Deployed as a Linux container to Azure App Service behind an nginx reverse proxy and Cloudflare:
-**https://budgetapp.example.com**.
+**https://budgetapp.cloudcreator.io**.
 
 ## Screenshots
 
