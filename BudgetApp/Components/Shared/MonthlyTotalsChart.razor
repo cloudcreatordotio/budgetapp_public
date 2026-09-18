@@ -1,0 +1,130 @@
+@* Hand-rolled SVG grouped-bar chart for month-over-month income vs. expenses — same
+   no-library approach as DonutChart (PLAN §4). SVG <text> is a reserved tag in Razor,
+   so text elements are emitted as MarkupString. *@
+
+<div class="bar-chart-wrap">
+    @if (Months.Count == 0 || _max == 0)
+    {
+        <div class="empty-state">No transactions in this period yet.</div>
+    }
+    else
+    {
+        <svg class="bar-chart-svg" viewBox="0 0 @F(Width) @F(Height)" role="img"
+             aria-label="Income and expenses by month">
+            @foreach (var line in _gridlines)
+            {
+                <line x1="@F(PlotLeft)" y1="@F(line.Y)" x2="@F(Width - 8)" y2="@F(line.Y)" class="chart-gridline"/>
+                @SvgText(PlotLeft - 8, line.Y + 4, "chart-axis-label", line.Label, anchor: "end")
+            }
+
+            @foreach (var group in _groups)
+            {
+                <rect x="@F(group.IncomeX)" y="@F(group.IncomeY)" width="@F(BarWidth)"
+                      height="@F(PlotBottom - group.IncomeY)" rx="3" fill="var(--positive)">
+                    <title>@group.Title — income @Fmt.Money(group.Income)</title>
+                </rect>
+                <rect x="@F(group.ExpenseX)" y="@F(group.ExpenseY)" width="@F(BarWidth)"
+                      height="@F(PlotBottom - group.ExpenseY)" rx="3" fill="var(--negative)">
+                    <title>@group.Title — expenses @Fmt.Money(group.Expenses)</title>
+                </rect>
+                @SvgText(group.CenterX, PlotBottom + 18, "chart-axis-label", group.Label)
+            }
+
+            <line x1="@F(PlotLeft)" y1="@F(PlotBottom)" x2="@F(Width - 8)" y2="@F(PlotBottom)" class="chart-baseline"/>
+        </svg>
+
+        <div class="chart-legend">
+            <span><span class="legend-dot-positive"></span>Income</span>
+            <span><span class="legend-dot-negative"></span>Expenses</span>
+        </div>
+    }
+</div>
+
+@code {
+    private const double Width = 640;
+    private const double Height = 300;
+    private const double PlotLeft = 64;
+    private const double PlotTop = 14;
+    private const double PlotBottom = Height - 34;
+    private const double BarWidth = 22;
+    private const double BarGap = 6;
+
+    [Parameter, EditorRequired] public IReadOnlyList<MonthTotals> Months { get; set; } = [];
+
+    private decimal _max;
+    private List<(double Y, string Label)> _gridlines = [];
+    private List<BarGroup> _groups = [];
+
+    private readonly record struct BarGroup(
+        string Label, string Title, decimal Income, decimal Expenses,
+        double IncomeX, double IncomeY, double ExpenseX, double ExpenseY, double CenterX);
+
+    protected override void OnParametersSet()
+    {
+        _gridlines = [];
+        _groups = [];
+        _max = Months.Count == 0 ? 0m : Months.Max(m => Math.Max(m.Income, m.Expenses));
+        if (_max == 0)
+        {
+            return;
+        }
+
+        var top = NiceCeiling(_max);
+        for (var i = 0; i <= 4; i++)
+        {
+            var value = top * i / 4;
+            _gridlines.Add((ScaleY(value, top), MoneyShort(value)));
+        }
+
+        var slot = (Width - 8 - PlotLeft) / Months.Count;
+        for (var i = 0; i < Months.Count; i++)
+        {
+            var m = Months[i];
+            var center = PlotLeft + slot * (i + 0.5);
+            var label = m.Month == 1 || i == 0
+                ? m.MonthStart.ToString("MMM ’yy", System.Globalization.CultureInfo.GetCultureInfo("en-US"))
+                : m.MonthStart.ToString("MMM", System.Globalization.CultureInfo.GetCultureInfo("en-US"));
+            _groups.Add(new BarGroup(
+                Label: label,
+                Title: Fmt.MonthYear(m.MonthStart),
+                Income: m.Income,
+                Expenses: m.Expenses,
+                IncomeX: center - BarWidth - BarGap / 2,
+                IncomeY: ScaleY(m.Income, top),
+                ExpenseX: center + BarGap / 2,
+                ExpenseY: ScaleY(m.Expenses, top),
+                CenterX: center));
+        }
+    }
+
+    private static double ScaleY(decimal value, decimal top) =>
+        PlotBottom - (double)(value / top) * (PlotBottom - PlotTop);
+
+    /// <summary>Rounds up to 1, 2, 2.5 or 5 × 10^k so the axis ends on a friendly number.</summary>
+    private static decimal NiceCeiling(decimal value)
+    {
+        var magnitude = (decimal)Math.Pow(10, Math.Floor(Math.Log10((double)value)));
+        foreach (var step in new[] { 1m, 2m, 2.5m, 5m, 10m })
+        {
+            if (value <= step * magnitude)
+            {
+                return step * magnitude;
+            }
+        }
+        return 10m * magnitude;
+    }
+
+    private static string MoneyShort(decimal value) => value switch
+    {
+        0m => "$0",
+        >= 1000m => $"${value / 1000m:0.#}k",
+        _ => $"${value:0.#}",
+    };
+
+    private static MarkupString SvgText(double x, double y, string cssClass, string content, string anchor = "middle") =>
+        new($"<text x=\"{F(x)}\" y=\"{F(y)}\" text-anchor=\"{anchor}\" class=\"{cssClass}\">" +
+            $"{System.Net.WebUtility.HtmlEncode(content)}</text>");
+
+    // Invariant formatting — SVG attributes must always use "." decimals.
+    private static string F(double value) => value.ToString("0.###", System.Globalization.CultureInfo.InvariantCulture);
+}

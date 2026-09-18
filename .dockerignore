@@ -1,0 +1,20 @@
+# Keep the build context to what the Dockerfile actually copies (BudgetApp/ sources).
+**/bin/
+**/obj/
+.git/
+.idea/
+.config/
+docs/
+deploy/
+infra/
+BudgetApp.Tests/
+BudgetApp/Screenshots/
+docker-compose.yml
+.env
+.env.example
+*.md
+**/*.md
+.DS_Store
+CLAUDE.md
+Dockerfile
+.dockerignore

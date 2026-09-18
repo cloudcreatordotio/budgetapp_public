@@ -1,0 +1,111 @@
+@* Hand-rolled SVG donut — no chart library, no JS interop (see PLAN §4). Slices are
+   stroked circle segments via stroke-dasharray; percent labels sit at each slice's
+   mid-angle. SVG <text> is a reserved tag in Razor, so text elements are emitted as
+   MarkupString. Also used by Reports (Session 3) for per-month breakdowns. *@
+
+<div class="donut-wrap">
+    <svg class="donut-svg" viewBox="0 0 200 200" role="img" aria-label="@AriaLabel">
+        @if (_total == 0)
+        {
+            <circle cx="100" cy="100" r="@Radius" fill="none" stroke="var(--border)" stroke-width="@StrokeWidth"/>
+            @SvgText(100, 105, "donut-center-title", "No data yet")
+        }
+        else
+        {
+            <g transform="rotate(-90 100 100)">
+                @foreach (var slice in _geometry)
+                {
+                    <circle cx="100" cy="100" r="@Radius" fill="none"
+                            stroke="@slice.Color" stroke-width="@StrokeWidth"
+                            stroke-dasharray="@slice.Dash" stroke-dashoffset="@slice.Offset"/>
+                }
+            </g>
+
+            @foreach (var slice in _geometry)
+            {
+                if (slice.ShowLabel)
+                {
+                    @SvgText(slice.LabelX, slice.LabelY, "donut-slice-label", slice.Percent)
+                }
+            }
+
+            @if (!string.IsNullOrEmpty(CenterValue))
+            {
+                @SvgText(100, 94, "donut-center-title", CenterTitle ?? "")
+                @SvgText(100, 114, "donut-center-value", CenterValue!)
+            }
+        }
+    </svg>
+
+    @if (ShowLegend && _total > 0)
+    {
+        <ul class="donut-legend">
+            @foreach (var slice in Slices)
+            {
+                <li>
+                    <span class="color-dot" style="background-color:@slice.ColorHex"></span>
+                    <span class="legend-label">@slice.Label</span>
+                    <span class="legend-value">@Fmt.Money(slice.Value)</span>
+                    <span class="legend-pct">@Fraction(slice).ToString("P0")</span>
+                </li>
+            }
+        </ul>
+    }
+</div>
+
+@code {
+    private const double Radius = 80;
+    private const double StrokeWidth = 34;
+    private const double Circumference = 2 * Math.PI * Radius;
+    private const double MinLabelFraction = 0.07;
+
+    private decimal _total;
+    private List<SliceGeometry> _geometry = [];
+
+    [Parameter, EditorRequired] public IReadOnlyList<DonutSlice> Slices { get; set; } = [];
+    [Parameter] public string? CenterTitle { get; set; }
+    [Parameter] public string? CenterValue { get; set; }
+    [Parameter] public bool ShowLegend { get; set; } = true;
+    [Parameter] public string AriaLabel { get; set; } = "Breakdown by category";
+
+    public sealed record DonutSlice(string Label, decimal Value, string ColorHex);
+
+    private readonly record struct SliceGeometry(
+        string Color, string Dash, string Offset, bool ShowLabel, double LabelX, double LabelY, string Percent);
+
+    protected override void OnParametersSet()
+    {
+        _total = Slices.Sum(s => s.Value);
+        _geometry = [];
+        if (_total == 0)
+        {
+            return;
+        }
+
+        var cumulative = 0.0;
+        foreach (var slice in Slices)
+        {
+            var fraction = Fraction(slice);
+            var length = fraction * Circumference;
+            var mid = (cumulative + fraction / 2) * 2 * Math.PI - Math.PI / 2;
+            _geometry.Add(new SliceGeometry(
+                Color: slice.ColorHex,
+                Dash: $"{F(length)} {F(Circumference - length)}",
+                Offset: F(-cumulative * Circumference),
+                ShowLabel: fraction >= MinLabelFraction,
+                LabelX: 100 + Math.Cos(mid) * Radius,
+                LabelY: 100 + Math.Sin(mid) * Radius + 4,
+                Percent: fraction.ToString("P0")));
+            cumulative += fraction;
+        }
+    }
+
+    private double Fraction(DonutSlice slice) => _total == 0 ? 0 : (double)(slice.Value / _total);
+
+    private static MarkupString SvgText(double x, double y, string cssClass, string content) =>
+        new($"<text x=\"{F(x)}\" y=\"{F(y)}\" text-anchor=\"middle\" class=\"{cssClass}\">" +
+            $"{System.Net.WebUtility.HtmlEncode(content)}</text>");
+
+    // Invariant formatting — SVG attributes must always use "." decimals.
+    private static string F(double value) => value.ToString("0.###", System.Globalization.CultureInfo.InvariantCulture);
+}

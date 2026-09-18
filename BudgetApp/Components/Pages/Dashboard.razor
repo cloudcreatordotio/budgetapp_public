@@ -1,0 +1,158 @@
+@page "/"
+@inject SummaryService Summary
+
+<PageTitle>Dashboard · BudgetApp</PageTitle>
+
+<div class="page-header">
+    <div>
+        <h1>Dashboard</h1>
+        <p class="page-subtitle">@Fmt.MonthYear(_today)</p>
+    </div>
+    <a class="btn-accent" href="transactions">+ Add transaction</a>
+</div>
+
+@if (!_loaded)
+{
+    <div class="card-panel">
+        <div class="empty-state">Loading…</div>
+    </div>
+}
+else
+{
+    <div class="stat-grid">
+        <StatCard Label="Income" Value="@Fmt.Money(_summary.Income)" Sub="this month"
+                  IconBackground="var(--positive-soft)" IconColor="var(--positive)">
+            <Icon>
+                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                     stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                    <path d="M16 7h6v6"/>
+                    <path d="m22 7-8.5 8.5-5-5L2 17"/>
+                </svg>
+            </Icon>
+        </StatCard>
+
+        <StatCard Label="Expenses" Value="@Fmt.Money(_summary.Expenses)" Sub="this month"
+                  IconBackground="var(--negative-soft)" IconColor="var(--negative)">
+            <Icon>
+                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                     stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                    <path d="M16 17h6v-6"/>
+                    <path d="m22 17-8.5-8.5-5 5L2 7"/>
+                </svg>
+            </Icon>
+        </StatCard>
+
+        <StatCard Label="Balance" Value="@Fmt.Money(_summary.Balance)" Sub="saved this month"
+                  ValueClass="@(_summary.Balance >= 0 ? "amount-pos" : "amount-neg")">
+            <Icon>
+                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                     stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                    <path d="M19 5c-1.5 0-2.8 1.4-3 2-3.5-1.5-11-.3-11 5 0 1.8 0 3 2 4.5V20h4v-2h3v2h4v-4c1-.5 1.7-1 2-2h2v-4h-2c0-1-.5-1.5-1-2V5z"/>
+                    <path d="M2 9v1c0 1.1.9 2 2 2h1"/>
+                </svg>
+            </Icon>
+        </StatCard>
+    </div>
+
+    <div class="dash-grid">
+        <div class="card-panel">
+            <h2 class="card-title">Spending by category</h2>
+            <DonutChart Slices="_slices" CenterTitle="Spent" CenterValue="@Fmt.Money(_summary.Expenses)"
+                        AriaLabel="Spending by category this month"/>
+        </div>
+
+        <div class="card-panel">
+            <h2 class="card-title">Saved vs. spent</h2>
+            <div class="progress-track">
+                <div class="progress-fill @(_overspent ? "over" : null)" style="width:@(Pct(_spentFraction))%"></div>
+            </div>
+            <div class="progress-legend">
+                <span><span class="legend-dot-accent"></span>Spent <strong>@Fmt.Money(_summary.Expenses)</strong></span>
+                <span><span class="legend-dot-positive"></span>Saved <strong>@Fmt.Money(Math.Max(0m, _summary.Balance))</strong></span>
+            </div>
+            @if (_overspent)
+            {
+                <p class="page-subtitle">Overspent by <strong class="amount-neg">@Fmt.Money(-_summary.Balance)</strong> this month.</p>
+            }
+            else if (_summary.Income > 0)
+            {
+                <p class="page-subtitle">You've spent @_spentFraction.ToString("P0") of this month's income.</p>
+            }
+            else
+            {
+                <p class="page-subtitle">No income recorded this month yet.</p>
+            }
+        </div>
+    </div>
+
+    <div class="card-panel">
+        <div class="page-header" style="margin-bottom:8px">
+            <h2 class="card-title" style="margin-bottom:0">Recent transactions</h2>
+            <a href="transactions">View all</a>
+        </div>
+        @if (_recent.Count == 0)
+        {
+            <div class="empty-state">No transactions yet — <a href="transactions">add your first one</a>.</div>
+        }
+        else
+        {
+            <div class="table-scroll">
+                <table class="data-table">
+                    <thead>
+                    <tr>
+                        <th>Date</th>
+                        <th>Description</th>
+                        <th>Merchant</th>
+                        <th>Category</th>
+                        <th class="num">Amount</th>
+                    </tr>
+                    </thead>
+                    <tbody>
+                    @foreach (var t in _recent)
+                    {
+                        <tr>
+                            <td>@Fmt.Date(t.Date)</td>
+                            <td>@t.Description</td>
+                            <td>@t.Merchant</td>
+                            <td>
+                                <span class="category-chip">
+                                    <span class="color-dot" style="background-color:@t.CategoryColorHex"></span>@t.CategoryName
+                                </span>
+                            </td>
+                            <td class="num @Fmt.AmountClass(t.Type)">@Fmt.SignedMoney(t.Amount, t.Type)</td>
+                        </tr>
+                    }
+                    </tbody>
+                </table>
+            </div>
+        }
+    </div>
+}
+
+@code {
+    private readonly DateOnly _today = DateOnly.FromDateTime(DateTime.Today);
+
+    private MonthlySummary _summary = new(0m, 0m);
+    private List<TransactionListItem> _recent = [];
+    private IReadOnlyList<DonutChart.DonutSlice> _slices = [];
+    private double _spentFraction;
+    private bool _overspent;
+    private bool _loaded;
+
+    protected override async Task OnInitializedAsync()
+    {
+        _summary = await Summary.GetMonthlySummaryAsync(_today.Year, _today.Month);
+        var spend = await Summary.GetMonthlyCategorySpendAsync(_today.Year, _today.Month);
+        _recent = await Summary.GetRecentAsync(8);
+
+        _slices = spend.Select(s => new DonutChart.DonutSlice(s.Name, s.Total, s.ColorHex)).ToList();
+        _overspent = _summary.Expenses > _summary.Income;
+        _spentFraction = _summary.Income > 0
+            ? Math.Min(1.0, (double)(_summary.Expenses / _summary.Income))
+            : (_summary.Expenses > 0 ? 1.0 : 0.0);
+        _loaded = true;
+    }
+
+    private static string Pct(double fraction) =>
+        (fraction * 100).ToString("0.#", System.Globalization.CultureInfo.InvariantCulture);
+}

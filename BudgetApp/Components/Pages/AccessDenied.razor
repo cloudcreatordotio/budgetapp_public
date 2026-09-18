@@ -1,0 +1,27 @@
+@page "/access-denied"
+@attribute [AllowAnonymous]
+@layout Layout.AuthLayout
+
+<PageTitle>Access denied · BudgetApp</PageTitle>
+
+<h1 class="auth-title">Access denied</h1>
+@if (Reason == "allowlist")
+{
+    <p class="auth-note">
+        That GitHub account isn't on BudgetApp's allowlist, so no account was created
+        and nothing was stored. If you think it should be, ask the owner to add your
+        GitHub login.
+    </p>
+}
+else
+{
+    <p class="auth-note">
+        Sign-in didn't complete — it was cancelled or failed along the way. No changes
+        were made; you can try again.
+    </p>
+}
+<a class="btn-accent auth-action" href="signin">Back to sign-in</a>
+
+@code {
+    [SupplyParameterFromQuery] public string? Reason { get; set; }
+}

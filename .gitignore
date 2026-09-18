@@ -1,0 +1,20 @@
+bin/
+obj/
+/packages/
+riderModule.iml
+/_ReSharper.Caches/
+
+# Local-only: planning docs, prompts, templates, and JetBrains project files
+/docs/
+/.idea/
+
+# macOS
+.DS_Store
+
+# Markdown stays local except the root README
+*.md
+!/README.md
+
+# Local secrets and machine-local config — never tracked
+.env
+**/appsettings.*.local.json

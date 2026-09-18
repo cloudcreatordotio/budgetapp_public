@@ -1,0 +1,26 @@
+<div class="stat-card">
+    @if (Icon is not null)
+    {
+        <div class="stat-icon" style="background-color:@IconBackground;color:@IconColor">
+            @Icon
+        </div>
+    }
+    <div>
+        <div class="stat-label">@Label</div>
+        <div class="stat-value @ValueClass">@Value</div>
+        @if (!string.IsNullOrEmpty(Sub))
+        {
+            <div class="stat-sub">@Sub</div>
+        }
+    </div>
+</div>
+
+@code {
+    [Parameter, EditorRequired] public string Label { get; set; } = "";
+    [Parameter, EditorRequired] public string Value { get; set; } = "";
+    [Parameter] public string? ValueClass { get; set; }
+    [Parameter] public string? Sub { get; set; }
+    [Parameter] public RenderFragment? Icon { get; set; }
+    [Parameter] public string IconBackground { get; set; } = "var(--accent-soft)";
+    [Parameter] public string IconColor { get; set; } = "var(--accent)";
+}

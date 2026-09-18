@@ -1,0 +1,77 @@
+@* Create/edit form for a transaction; the parent owns the modal shell and persistence. *@
+
+<EditForm Model="Model" OnValidSubmit="() => OnValidSubmit.InvokeAsync()">
+    <DataAnnotationsValidator/>
+
+    <div class="form-grid">
+        <div class="form-field span-2">
+            <label for="tx-description">Description</label>
+            <InputText id="tx-description" class="input-control" @bind-Value="Model.Description"
+                       placeholder="e.g. Weekly groceries"/>
+            <ValidationMessage For="() => Model.Description"/>
+        </div>
+
+        <div class="form-field span-2">
+            <label for="tx-merchant">Merchant</label>
+            <InputText id="tx-merchant" class="input-control" @bind-Value="Model.Merchant"
+                       placeholder="e.g. Trader Joe's"/>
+            <ValidationMessage For="() => Model.Merchant"/>
+        </div>
+
+        <div class="form-field">
+            <label for="tx-amount">Amount ($)</label>
+            <InputNumber id="tx-amount" class="input-control" @bind-Value="Model.Amount" step="0.01"/>
+            <ValidationMessage For="() => Model.Amount"/>
+        </div>
+
+        <div class="form-field">
+            <label for="tx-type">Type</label>
+            <InputSelect id="tx-type" class="input-control" @bind-Value="Model.Type">
+                <option value="">Select…</option>
+                <option value="@TransactionType.Expense">Expense</option>
+                <option value="@TransactionType.Income">Income</option>
+            </InputSelect>
+            <ValidationMessage For="() => Model.Type"/>
+        </div>
+
+        <div class="form-field">
+            <label for="tx-date">Date</label>
+            <InputDate id="tx-date" class="input-control" @bind-Value="Model.Date"/>
+            <ValidationMessage For="() => Model.Date"/>
+        </div>
+
+        <div class="form-field">
+            <label for="tx-category">Category</label>
+            <InputSelect id="tx-category" class="input-control" @bind-Value="Model.CategoryId">
+                <option value="">Select…</option>
+                @foreach (var category in Categories)
+                {
+                    <option value="@category.Id">@category.Name</option>
+                }
+            </InputSelect>
+            <ValidationMessage For="() => Model.CategoryId"/>
+        </div>
+    </div>
+
+    @if (!string.IsNullOrEmpty(Error))
+    {
+        <div class="error-banner">@Error</div>
+    }
+
+    <div class="modal-actions">
+        <button type="button" class="btn-plain" disabled="@Busy" @onclick="() => OnCancel.InvokeAsync()">
+            Cancel
+        </button>
+        <button type="submit" class="btn-accent" disabled="@Busy">@SubmitLabel</button>
+    </div>
+</EditForm>
+
+@code {
+    [Parameter, EditorRequired] public TransactionInput Model { get; set; } = null!;
+    [Parameter, EditorRequired] public IReadOnlyList<CategoryItem> Categories { get; set; } = [];
+    [Parameter] public string SubmitLabel { get; set; } = "Save";
+    [Parameter] public string? Error { get; set; }
+    [Parameter] public bool Busy { get; set; }
+    [Parameter] public EventCallback OnValidSubmit { get; set; }
+    [Parameter] public EventCallback OnCancel { get; set; }
+}

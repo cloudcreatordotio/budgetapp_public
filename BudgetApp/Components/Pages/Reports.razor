@@ -1,0 +1,120 @@
+@page "/reports"
+@inject SummaryService Summary
+
+<PageTitle>Reports · BudgetApp</PageTitle>
+
+<div class="page-header">
+    <div>
+        <h1>Reports</h1>
+        <p class="page-subtitle">Month-over-month totals and per-month category breakdown</p>
+    </div>
+</div>
+
+@if (!_loaded)
+{
+    <div class="card-panel">
+        <div class="empty-state">Loading…</div>
+    </div>
+}
+else
+{
+    <div class="card-panel">
+        <h2 class="card-title">Income vs. expenses — last @MonthsBack months</h2>
+        <MonthlyTotalsChart Months="_monthTotals"/>
+    </div>
+
+    <div class="report-grid">
+        <div class="card-panel">
+            <div class="page-header" style="margin-bottom:8px">
+                <h2 class="card-title" style="margin-bottom:0">Spending by category</h2>
+                <select class="input-control" @bind="_selectedMonthKey" @bind:after="LoadSelectedMonthAsync"
+                        aria-label="Report month">
+                    @foreach (var month in _availableMonths)
+                    {
+                        <option value="@Key(month)">@Fmt.MonthYear(month)</option>
+                    }
+                </select>
+            </div>
+            <DonutChart Slices="_slices" CenterTitle="Spent" CenterValue="@Fmt.Money(_selectedSummary.Expenses)"
+                        AriaLabel="Spending by category for the selected month"/>
+        </div>
+
+        <div class="card-panel">
+            <h2 class="card-title">@Fmt.MonthYear(_selectedMonth) at a glance</h2>
+            <dl class="report-facts">
+                <div>
+                    <dt>Income</dt>
+                    <dd class="amount-pos">@Fmt.Money(_selectedSummary.Income)</dd>
+                </div>
+                <div>
+                    <dt>Expenses</dt>
+                    <dd class="amount-neg">@Fmt.Money(_selectedSummary.Expenses)</dd>
+                </div>
+                <div>
+                    <dt>Balance</dt>
+                    <dd class="@(_selectedSummary.Balance >= 0 ? "amount-pos" : "amount-neg")">
+                        @Fmt.Money(_selectedSummary.Balance)
+                    </dd>
+                </div>
+                <div>
+                    <dt>Top expense category</dt>
+                    <dd>
+                        @if (_slices.Count > 0)
+                        {
+                            <span class="category-chip">
+                                <span class="color-dot" style="background-color:@_slices[0].ColorHex"></span>@_slices[0].Label
+                            </span>
+                        }
+                        else
+                        {
+                            <span class="page-subtitle">—</span>
+                        }
+                    </dd>
+                </div>
+            </dl>
+        </div>
+    </div>
+}
+
+@code {
+    private const int MonthsBack = 6;
+
+    private List<MonthTotals> _monthTotals = [];
+    private List<DateOnly> _availableMonths = [];
+    private string _selectedMonthKey = "";
+    private DateOnly _selectedMonth;
+    private MonthlySummary _selectedSummary = new(0m, 0m);
+    private List<DonutChart.DonutSlice> _slices = [];
+    private bool _loaded;
+
+    protected override async Task OnInitializedAsync()
+    {
+        var today = DateOnly.FromDateTime(DateTime.Today);
+        var currentMonth = new DateOnly(today.Year, today.Month, 1);
+
+        _monthTotals = await Summary.GetMonthOverMonthAsync(MonthsBack);
+
+        // Month picker: newest first, from the current month back to the first month
+        // with data (capped at 24 entries to keep the list sane).
+        var firstMonth = await Summary.GetFirstTransactionMonthAsync() ?? currentMonth;
+        _availableMonths = [];
+        for (var m = currentMonth; m >= firstMonth && _availableMonths.Count < 24; m = m.AddMonths(-1))
+        {
+            _availableMonths.Add(m);
+        }
+
+        _selectedMonthKey = Key(currentMonth);
+        await LoadSelectedMonthAsync();
+        _loaded = true;
+    }
+
+    private async Task LoadSelectedMonthAsync()
+    {
+        _selectedMonth = DateOnly.ParseExact(_selectedMonthKey, "yyyy-MM");
+        _selectedSummary = await Summary.GetMonthlySummaryAsync(_selectedMonth.Year, _selectedMonth.Month);
+        var spend = await Summary.GetMonthlyCategorySpendAsync(_selectedMonth.Year, _selectedMonth.Month);
+        _slices = spend.Select(s => new DonutChart.DonutSlice(s.Name, s.Total, s.ColorHex)).ToList();
+    }
+
+    private static string Key(DateOnly month) => month.ToString("yyyy-MM");
+}

@@ -1,0 +1,270 @@
+@page "/categories"
+@inject CategoryService Cats
+
+<PageTitle>Categories · BudgetApp</PageTitle>
+
+<div class="page-header">
+    <div>
+        <h1>Categories</h1>
+        <p class="page-subtitle">Organize transactions your way — add, rename, and recolor.</p>
+    </div>
+</div>
+
+<div class="card-panel" style="margin-bottom:16px">
+    <h2 class="card-title">Add a category</h2>
+    <EditForm Model="_newCategory" OnValidSubmit="AddAsync">
+        <DataAnnotationsValidator/>
+        <div class="filter-bar" style="margin-bottom:0">
+            <div class="filter-field">
+                <label for="new-name">Name</label>
+                <InputText id="new-name" class="input-control" @bind-Value="_newCategory.Name"
+                           placeholder="e.g. Travel"/>
+            </div>
+            <div class="filter-field">
+                <label for="new-color">Color</label>
+                <InputText id="new-color" type="color" class="input-control" @bind-Value="_newCategory.ColorHex"/>
+            </div>
+            <button type="submit" class="btn-accent" disabled="@_adding">Add category</button>
+        </div>
+        <ValidationMessage For="() => _newCategory.Name"/>
+        <ValidationMessage For="() => _newCategory.ColorHex"/>
+        @if (!string.IsNullOrEmpty(_addError))
+        {
+            <div class="error-banner">@_addError</div>
+        }
+    </EditForm>
+</div>
+
+<div class="card-panel">
+    @if (_categories is null)
+    {
+        <div class="empty-state">Loading…</div>
+    }
+    else if (_categories.Count == 0)
+    {
+        <div class="empty-state">No categories yet — add one above.</div>
+    }
+    else
+    {
+        <div class="table-scroll">
+            <table class="data-table">
+                <thead>
+                <tr>
+                    <th>Color</th>
+                    <th>Name</th>
+                    <th class="num">Transactions</th>
+                    <th></th>
+                </tr>
+                </thead>
+                <tbody>
+                @foreach (var category in _categories)
+                {
+                    <tr>
+                        <td><span class="color-swatch" style="background-color:@category.ColorHex"></span></td>
+                        <td>@category.Name</td>
+                        <td class="num">@category.TransactionCount</td>
+                        <td class="actions">
+                            <button type="button" class="icon-btn" title="Edit" @onclick="() => OpenEdit(category)">
+                                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                                     stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                                    <path d="M21.17 6.83a2.83 2.83 0 0 0-4-4L3.84 16.17a2 2 0 0 0-.5.83l-1.32 4.35a.5.5 0 0 0 .62.62l4.35-1.32a2 2 0 0 0 .83-.5Z"/>
+                                    <path d="m15 5 4 4"/>
+                                </svg>
+                            </button>
+                            <button type="button" class="icon-btn danger" disabled="@category.InUse"
+                                    title="@(category.InUse ? $"In use by {category.TransactionCount} transaction(s) — reassign them first" : "Delete")"
+                                    @onclick="() => OpenDelete(category)">
+                                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                                     stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                                    <path d="M3 6h18"/>
+                                    <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6"/>
+                                    <path d="M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/>
+                                    <line x1="10" x2="10" y1="11" y2="17"/>
+                                    <line x1="14" x2="14" y1="11" y2="17"/>
+                                </svg>
+                            </button>
+                        </td>
+                    </tr>
+                }
+                </tbody>
+            </table>
+        </div>
+    }
+</div>
+
+@if (_editModel is not null)
+{
+    <div class="modal-overlay">
+        <div class="modal-card modal-sm">
+            <h3>Edit category</h3>
+            <EditForm Model="_editModel" OnValidSubmit="SaveEditAsync">
+                <DataAnnotationsValidator/>
+                <div class="form-grid">
+                    <div class="form-field span-2">
+                        <label for="edit-name">Name</label>
+                        <InputText id="edit-name" class="input-control" @bind-Value="_editModel.Name"/>
+                        <ValidationMessage For="() => _editModel.Name"/>
+                    </div>
+                    <div class="form-field">
+                        <label for="edit-color">Color</label>
+                        <InputText id="edit-color" type="color" class="input-control" @bind-Value="_editModel.ColorHex"/>
+                        <ValidationMessage For="() => _editModel.ColorHex"/>
+                    </div>
+                </div>
+                @if (!string.IsNullOrEmpty(_editError))
+                {
+                    <div class="error-banner">@_editError</div>
+                }
+                <div class="modal-actions">
+                    <button type="button" class="btn-plain" disabled="@_savingEdit" @onclick="CloseEdit">Cancel</button>
+                    <button type="submit" class="btn-accent" disabled="@_savingEdit">Save changes</button>
+                </div>
+            </EditForm>
+        </div>
+    </div>
+}
+
+<ConfirmDialog Open="_deleting is not null"
+               Title="Delete category?"
+               Message="@DeleteMessage"
+               Error="@_deleteError"
+               Busy="_deletingBusy"
+               OnConfirm="DeleteConfirmedAsync"
+               OnCancel="() => _deleting = null"/>
+
+@code {
+    private List<CategoryItem>? _categories;
+
+    private CategoryInput _newCategory = new();
+    private string? _addError;
+    private bool _adding;
+
+    private CategoryInput? _editModel;
+    private int? _editingId;
+    private string? _editError;
+    private bool _savingEdit;
+
+    private CategoryItem? _deleting;
+    private string? _deleteError;
+    private bool _deletingBusy;
+
+    private string? DeleteMessage => _deleting is { } c
+        ? $"This permanently removes \"{c.Name}\". Categories in use can't be deleted."
+        : null;
+
+    protected override async Task OnInitializedAsync() => await ReloadAsync();
+
+    private async Task ReloadAsync()
+    {
+        _categories = await Cats.GetAsync();
+        if (string.IsNullOrEmpty(_newCategory.ColorHex))
+        {
+            _newCategory.ColorHex = NextUnusedColor();
+        }
+    }
+
+    /// <summary>First palette color no current category uses, so new categories stay distinct.</summary>
+    private string NextUnusedColor()
+    {
+        var used = new HashSet<string>(
+            _categories?.Select(c => c.ColorHex) ?? [], StringComparer.OrdinalIgnoreCase);
+        return Data.SeedData.DefaultCategories
+                   .Select(c => c.ColorHex)
+                   .FirstOrDefault(color => !used.Contains(color))
+               ?? "#4E79A7";
+    }
+
+    private async Task AddAsync()
+    {
+        _adding = true;
+        try
+        {
+            var result = await Cats.CreateAsync(_newCategory);
+            if (!result.Succeeded)
+            {
+                _addError = result.Error;
+                return;
+            }
+
+            _addError = null;
+            _newCategory = new CategoryInput();
+            await ReloadAsync();
+        }
+        finally
+        {
+            _adding = false;
+        }
+    }
+
+    private void OpenEdit(CategoryItem category)
+    {
+        _editError = null;
+        _editingId = category.Id;
+        _editModel = new CategoryInput { Name = category.Name, ColorHex = category.ColorHex };
+    }
+
+    private void CloseEdit()
+    {
+        _editModel = null;
+        _editingId = null;
+        _editError = null;
+    }
+
+    private async Task SaveEditAsync()
+    {
+        if (_editModel is null || _editingId is not { } id)
+        {
+            return;
+        }
+
+        _savingEdit = true;
+        try
+        {
+            var result = await Cats.UpdateAsync(id, _editModel);
+            if (!result.Succeeded)
+            {
+                _editError = result.Error;
+                return;
+            }
+
+            CloseEdit();
+            await ReloadAsync();
+        }
+        finally
+        {
+            _savingEdit = false;
+        }
+    }
+
+    private void OpenDelete(CategoryItem category)
+    {
+        _deleteError = null;
+        _deleting = category;
+    }
+
+    private async Task DeleteConfirmedAsync()
+    {
+        if (_deleting is null)
+        {
+            return;
+        }
+
+        _deletingBusy = true;
+        try
+        {
+            var result = await Cats.DeleteAsync(_deleting.Id);
+            if (!result.Succeeded)
+            {
+                _deleteError = result.Error;
+                return;
+            }
+
+            _deleting = null;
+            await ReloadAsync();
+        }
+        finally
+        {
+            _deletingBusy = false;
+        }
+    }
+}

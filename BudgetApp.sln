@@ -1,0 +1,45 @@
+﻿
+Microsoft Visual Studio Solution File, Format Version 12.00
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "BudgetApp", "BudgetApp\BudgetApp.csproj", "{C450C8CC-EF80-44B4-8953-650789ADF44A}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "BudgetApp.Tests", "BudgetApp.Tests\BudgetApp.Tests.csproj", "{CAB538A6-FEC7-4B61-8AF4-2933AA6588A0}"
+EndProject
+Global
+	GlobalSection(SolutionConfigurationPlatforms) = preSolution
+		Debug|Any CPU = Debug|Any CPU
+		Debug|x64 = Debug|x64
+		Debug|x86 = Debug|x86
+		Release|Any CPU = Release|Any CPU
+		Release|x64 = Release|x64
+		Release|x86 = Release|x86
+	EndGlobalSection
+	GlobalSection(ProjectConfigurationPlatforms) = postSolution
+		{C450C8CC-EF80-44B4-8953-650789ADF44A}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{C450C8CC-EF80-44B4-8953-650789ADF44A}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{C450C8CC-EF80-44B4-8953-650789ADF44A}.Debug|x64.ActiveCfg = Debug|Any CPU
+		{C450C8CC-EF80-44B4-8953-650789ADF44A}.Debug|x64.Build.0 = Debug|Any CPU
+		{C450C8CC-EF80-44B4-8953-650789ADF44A}.Debug|x86.ActiveCfg = Debug|Any CPU
+		{C450C8CC-EF80-44B4-8953-650789ADF44A}.Debug|x86.Build.0 = Debug|Any CPU
+		{C450C8CC-EF80-44B4-8953-650789ADF44A}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{C450C8CC-EF80-44B4-8953-650789ADF44A}.Release|Any CPU.Build.0 = Release|Any CPU
+		{C450C8CC-EF80-44B4-8953-650789ADF44A}.Release|x64.ActiveCfg = Release|Any CPU
+		{C450C8CC-EF80-44B4-8953-650789ADF44A}.Release|x64.Build.0 = Release|Any CPU
+		{C450C8CC-EF80-44B4-8953-650789ADF44A}.Release|x86.ActiveCfg = Release|Any CPU
+		{C450C8CC-EF80-44B4-8953-650789ADF44A}.Release|x86.Build.0 = Release|Any CPU
+		{CAB538A6-FEC7-4B61-8AF4-2933AA6588A0}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{CAB538A6-FEC7-4B61-8AF4-2933AA6588A0}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{CAB538A6-FEC7-4B61-8AF4-2933AA6588A0}.Debug|x64.ActiveCfg = Debug|Any CPU
+		{CAB538A6-FEC7-4B61-8AF4-2933AA6588A0}.Debug|x64.Build.0 = Debug|Any CPU
+		{CAB538A6-FEC7-4B61-8AF4-2933AA6588A0}.Debug|x86.ActiveCfg = Debug|Any CPU
+		{CAB538A6-FEC7-4B61-8AF4-2933AA6588A0}.Debug|x86.Build.0 = Debug|Any CPU
+		{CAB538A6-FEC7-4B61-8AF4-2933AA6588A0}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{CAB538A6-FEC7-4B61-8AF4-2933AA6588A0}.Release|Any CPU.Build.0 = Release|Any CPU
+		{CAB538A6-FEC7-4B61-8AF4-2933AA6588A0}.Release|x64.ActiveCfg = Release|Any CPU
+		{CAB538A6-FEC7-4B61-8AF4-2933AA6588A0}.Release|x64.Build.0 = Release|Any CPU
+		{CAB538A6-FEC7-4B61-8AF4-2933AA6588A0}.Release|x86.ActiveCfg = Release|Any CPU
+		{CAB538A6-FEC7-4B61-8AF4-2933AA6588A0}.Release|x86.Build.0 = Release|Any CPU
+	EndGlobalSection
+	GlobalSection(SolutionProperties) = preSolution
+		HideSolutionNode = FALSE
+	EndGlobalSection
+EndGlobal

@@ -1,0 +1,322 @@
+@page "/transactions"
+@inject TransactionService Tx
+@inject CategoryService Cats
+
+<PageTitle>Transactions · BudgetApp</PageTitle>
+
+<div class="page-header">
+    <div>
+        <h1>Transactions</h1>
+        <p class="page-subtitle">Every income and expense, filterable and sortable.</p>
+    </div>
+    <button type="button" class="btn-accent" @onclick="OpenAddAsync">+ Add transaction</button>
+</div>
+
+<div class="card-panel">
+    <div class="filter-bar">
+        <div class="filter-field">
+            <label for="f-from">From</label>
+            <input id="f-from" type="date" class="input-control"
+                   @bind="_from" @bind:format="yyyy-MM-dd" @bind:after="ReloadAsync"/>
+        </div>
+        <div class="filter-field">
+            <label for="f-to">To</label>
+            <input id="f-to" type="date" class="input-control"
+                   @bind="_to" @bind:format="yyyy-MM-dd" @bind:after="ReloadAsync"/>
+        </div>
+        <div class="filter-field">
+            <label for="f-category">Category</label>
+            <select id="f-category" class="input-control" @bind="_categoryFilter" @bind:after="ReloadAsync">
+                <option value="">All categories</option>
+                @foreach (var category in _categories)
+                {
+                    <option value="@category.Id">@category.Name</option>
+                }
+            </select>
+        </div>
+        <div class="filter-field">
+            <label for="f-type">Type</label>
+            <select id="f-type" class="input-control" @bind="_typeFilter" @bind:after="ReloadAsync">
+                <option value="">All types</option>
+                <option value="@TransactionType.Income">Income</option>
+                <option value="@TransactionType.Expense">Expense</option>
+            </select>
+        </div>
+        <button type="button" class="btn-plain" @onclick="ResetFiltersAsync">Reset</button>
+    </div>
+
+    @if (_items is null)
+    {
+        <div class="empty-state">Loading…</div>
+    }
+    else if (_items.Count == 0)
+    {
+        <div class="empty-state">No transactions match these filters.</div>
+    }
+    else
+    {
+        <div class="table-scroll">
+            <table class="data-table">
+                <thead>
+                <tr>
+                    <th class="sortable" @onclick="() => SortByAsync(TransactionSort.Date)">
+                        Date<span class="sort-arrow">@Arrow(TransactionSort.Date)</span>
+                    </th>
+                    <th class="sortable" @onclick="() => SortByAsync(TransactionSort.Description)">
+                        Description<span class="sort-arrow">@Arrow(TransactionSort.Description)</span>
+                    </th>
+                    <th class="sortable" @onclick="() => SortByAsync(TransactionSort.Merchant)">
+                        Merchant<span class="sort-arrow">@Arrow(TransactionSort.Merchant)</span>
+                    </th>
+                    <th class="sortable" @onclick="() => SortByAsync(TransactionSort.Category)">
+                        Category<span class="sort-arrow">@Arrow(TransactionSort.Category)</span>
+                    </th>
+                    <th class="sortable" @onclick="() => SortByAsync(TransactionSort.Type)">
+                        Type<span class="sort-arrow">@Arrow(TransactionSort.Type)</span>
+                    </th>
+                    <th class="sortable num" @onclick="() => SortByAsync(TransactionSort.Amount)">
+                        Amount<span class="sort-arrow">@Arrow(TransactionSort.Amount)</span>
+                    </th>
+                    <th></th>
+                </tr>
+                </thead>
+                <tbody>
+                @foreach (var t in _items)
+                {
+                    <tr>
+                        <td>@Fmt.Date(t.Date)</td>
+                        <td>@t.Description</td>
+                        <td>@t.Merchant</td>
+                        <td>
+                            <span class="category-chip">
+                                <span class="color-dot" style="background-color:@t.CategoryColorHex"></span>@t.CategoryName
+                            </span>
+                        </td>
+                        <td>
+                            <span class="type-badge @(t.Type == TransactionType.Income ? "income" : "expense")">@t.Type</span>
+                        </td>
+                        <td class="num @Fmt.AmountClass(t.Type)">@Fmt.SignedMoney(t.Amount, t.Type)</td>
+                        <td class="actions">
+                            <button type="button" class="icon-btn" title="Edit" @onclick="() => OpenEditAsync(t)">
+                                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                                     stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                                    <path d="M21.17 6.83a2.83 2.83 0 0 0-4-4L3.84 16.17a2 2 0 0 0-.5.83l-1.32 4.35a.5.5 0 0 0 .62.62l4.35-1.32a2 2 0 0 0 .83-.5Z"/>
+                                    <path d="m15 5 4 4"/>
+                                </svg>
+                            </button>
+                            <button type="button" class="icon-btn danger" title="Delete" @onclick="() => OpenDelete(t)">
+                                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                                     stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                                    <path d="M3 6h18"/>
+                                    <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6"/>
+                                    <path d="M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/>
+                                    <line x1="10" x2="10" y1="11" y2="17"/>
+                                    <line x1="14" x2="14" y1="11" y2="17"/>
+                                </svg>
+                            </button>
+                        </td>
+                    </tr>
+                }
+                </tbody>
+            </table>
+        </div>
+        <div class="table-footnote">
+            <span>@_items.Count transaction@(_items.Count == 1 ? "" : "s")</span>
+            <span>
+                Income <strong class="amount-pos">@Fmt.Money(FilteredIncome)</strong>
+                &nbsp;·&nbsp; Expenses <strong class="amount-neg">@Fmt.Money(FilteredExpenses)</strong>
+            </span>
+        </div>
+    }
+</div>
+
+@if (_editModel is not null)
+{
+    <div class="modal-overlay">
+        <div class="modal-card">
+            <h3>@(_editingId is null ? "Add transaction" : "Edit transaction")</h3>
+            <TransactionForm Model="_editModel" Categories="_categories" Error="@_formError" Busy="_saving"
+                             SubmitLabel="@(_editingId is null ? "Add transaction" : "Save changes")"
+                             OnValidSubmit="SaveAsync" OnCancel="CloseEditor"/>
+        </div>
+    </div>
+}
+
+<ConfirmDialog Open="_deleting is not null"
+               Title="Delete transaction?"
+               Message="@DeleteMessage"
+               Error="@_deleteError"
+               Busy="_deletingBusy"
+               OnConfirm="DeleteConfirmedAsync"
+               OnCancel="() => _deleting = null"/>
+
+@code {
+    private IReadOnlyList<CategoryItem> _categories = [];
+    private List<TransactionListItem>? _items;
+
+    private DateOnly? _from;
+    private DateOnly? _to;
+    private string _categoryFilter = "";
+    private string _typeFilter = "";
+    private TransactionSort _sort = TransactionSort.Date;
+    private bool _desc = true;
+
+    private TransactionInput? _editModel;
+    private int? _editingId;
+    private string? _formError;
+    private bool _saving;
+
+    private TransactionListItem? _deleting;
+    private string? _deleteError;
+    private bool _deletingBusy;
+
+    private decimal FilteredIncome =>
+        _items?.Where(t => t.Type == TransactionType.Income).Sum(t => t.Amount) ?? 0m;
+
+    private decimal FilteredExpenses =>
+        _items?.Where(t => t.Type == TransactionType.Expense).Sum(t => t.Amount) ?? 0m;
+
+    private string? DeleteMessage => _deleting is { } t
+        ? $"This permanently removes \"{t.Description}\" ({Fmt.SignedMoney(t.Amount, t.Type)}) from {Fmt.Date(t.Date)}."
+        : null;
+
+    protected override async Task OnInitializedAsync()
+    {
+        _categories = await Cats.GetAsync();
+        await ReloadAsync();
+    }
+
+    private async Task ReloadAsync()
+    {
+        var filter = new TransactionFilter(
+            From: _from,
+            To: _to,
+            CategoryId: int.TryParse(_categoryFilter, out var categoryId) ? categoryId : null,
+            Type: Enum.TryParse<TransactionType>(_typeFilter, out var type) ? type : null,
+            Sort: _sort,
+            Descending: _desc);
+        _items = await Tx.GetAsync(filter);
+    }
+
+    private async Task SortByAsync(TransactionSort column)
+    {
+        if (_sort == column)
+        {
+            _desc = !_desc;
+        }
+        else
+        {
+            _sort = column;
+            // Newest/biggest first feels right for dates and amounts; A→Z for text.
+            _desc = column is TransactionSort.Date or TransactionSort.Amount;
+        }
+
+        await ReloadAsync();
+    }
+
+    private string Arrow(TransactionSort column) => _sort != column ? "" : _desc ? "▼" : "▲";
+
+    private async Task ResetFiltersAsync()
+    {
+        _from = null;
+        _to = null;
+        _categoryFilter = "";
+        _typeFilter = "";
+        await ReloadAsync();
+    }
+
+    private async Task OpenAddAsync()
+    {
+        _categories = await Cats.GetAsync();
+        _formError = null;
+        _editingId = null;
+        _editModel = new TransactionInput
+        {
+            Date = DateOnly.FromDateTime(DateTime.Today),
+            Type = TransactionType.Expense,
+        };
+    }
+
+    private async Task OpenEditAsync(TransactionListItem t)
+    {
+        _categories = await Cats.GetAsync();
+        _formError = null;
+        _editingId = t.Id;
+        _editModel = new TransactionInput
+        {
+            Description = t.Description,
+            Merchant = t.Merchant,
+            Amount = t.Amount,
+            Type = t.Type,
+            Date = t.Date,
+            CategoryId = t.CategoryId,
+        };
+    }
+
+    private void CloseEditor()
+    {
+        _editModel = null;
+        _editingId = null;
+        _formError = null;
+    }
+
+    private async Task SaveAsync()
+    {
+        if (_editModel is null)
+        {
+            return;
+        }
+
+        _saving = true;
+        try
+        {
+            var result = _editingId is { } id
+                ? await Tx.UpdateAsync(id, _editModel)
+                : await Tx.CreateAsync(_editModel);
+            if (!result.Succeeded)
+            {
+                _formError = result.Error;
+                return;
+            }
+
+            CloseEditor();
+            await ReloadAsync();
+        }
+        finally
+        {
+            _saving = false;
+        }
+    }
+
+    private void OpenDelete(TransactionListItem t)
+    {
+        _deleteError = null;
+        _deleting = t;
+    }
+
+    private async Task DeleteConfirmedAsync()
+    {
+        if (_deleting is null)
+        {
+            return;
+        }
+
+        _deletingBusy = true;
+        try
+        {
+            var result = await Tx.DeleteAsync(_deleting.Id);
+            if (!result.Succeeded)
+            {
+                _deleteError = result.Error;
+                return;
+            }
+
+            _deleting = null;
+            await ReloadAsync();
+        }
+        finally
+        {
+            _deletingBusy = false;
+        }
+    }
+}

@@ -1,0 +1,64 @@
+@inherits LayoutComponentBase
+@inject ICurrentUserService CurrentUser
+
+<div class="page">
+    <div class="sidebar">
+        <NavMenu/>
+    </div>
+
+    <main>
+        <header class="top-row">
+            @if (_user is not null)
+            {
+                <div class="user-chip" title="Signed in as @_user.Login">
+                    <span class="user-avatar" aria-hidden="true">@_initials</span>
+                    <span class="user-name">@_user.Name</span>
+                </div>
+                <form method="post" action="auth/signout" class="signout-form">
+                    <AntiforgeryToken/>
+                    <button type="submit" class="signout-btn" title="Sign out">
+                        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                             stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                            <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/>
+                            <path d="m16 17 5-5-5-5"/>
+                            <path d="M21 12H9"/>
+                        </svg>
+                        <span>Sign out</span>
+                    </button>
+                </form>
+            }
+        </header>
+
+        <article class="content">
+            @Body
+        </article>
+    </main>
+</div>
+
+<div id="blazor-error-ui" data-nosnippet>
+    An unhandled error has occurred.
+    <a href="." class="reload">Reload</a>
+    <span class="dismiss">🗙</span>
+</div>
+
+@code {
+    private CurrentUser? _user;
+    private string _initials = "";
+
+    protected override async Task OnInitializedAsync()
+    {
+        try
+        {
+            _user = await CurrentUser.GetRequiredUserAsync();
+            _initials = string.Concat(_user.Name
+                .Split(' ', StringSplitOptions.RemoveEmptyEntries)
+                .Take(2)
+                .Select(part => char.ToUpperInvariant(part[0])));
+        }
+        catch (InvalidOperationException)
+        {
+            // No resolvable user (e.g. unseeded database) — pages surface their own errors;
+            // the layout just omits the chip.
+        }
+    }
+}

@@ -1,0 +1,13 @@
+@inject NavigationManager Nav
+
+@code {
+    protected override void OnInitialized()
+    {
+        var relative = Nav.ToBaseRelativePath(Nav.Uri);
+        var target = string.IsNullOrEmpty(relative)
+            ? "signin"
+            : $"signin?ReturnUrl={Uri.EscapeDataString("/" + relative)}";
+        // Full load so the request re-enters the HTTP auth pipeline.
+        Nav.NavigateTo(target, forceLoad: true);
+    }
+}
