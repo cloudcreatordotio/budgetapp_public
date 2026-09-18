@@ -45,11 +45,11 @@
         <button type="button" class="btn-plain" @onclick="ResetFiltersAsync">Reset</button>
     </div>
 
-    @if (_items is null)
+    @if (_page is null)
     {
         <div class="empty-state">Loading…</div>
     }
-    else if (_items.Count == 0)
+    else if (_page.TotalCount == 0)
     {
         <div class="empty-state">No transactions match these filters.</div>
     }
@@ -81,7 +81,7 @@
                 </tr>
                 </thead>
                 <tbody>
-                @foreach (var t in _items)
+                @foreach (var t in _page.Items)
                 {
                     <tr>
                         <td>@Fmt.Date(t.Date)</td>
@@ -121,12 +121,32 @@
             </table>
         </div>
         <div class="table-footnote">
-            <span>@_items.Count transaction@(_items.Count == 1 ? "" : "s")</span>
             <span>
-                Income <strong class="amount-pos">@Fmt.Money(FilteredIncome)</strong>
-                &nbsp;·&nbsp; Expenses <strong class="amount-neg">@Fmt.Money(FilteredExpenses)</strong>
+                Showing @_page.FirstIndex–@_page.LastIndex of @_page.TotalCount transaction@(_page.TotalCount == 1 ? "" : "s")
+            </span>
+            <span>
+                Income <strong class="amount-pos">@Fmt.Money(_page.IncomeTotal)</strong>
+                &nbsp;·&nbsp; Expenses <strong class="amount-neg">@Fmt.Money(_page.ExpenseTotal)</strong>
             </span>
         </div>
+        <nav class="pager" aria-label="Transaction pages">
+            <div class="pager-size">
+                <label for="f-page-size">Rows per page</label>
+                <select id="f-page-size" class="input-control" @bind="_pageSize" @bind:after="PageSizeChangedAsync">
+                    @foreach (var size in TransactionPage.PageSizes)
+                    {
+                        <option value="@size">@size</option>
+                    }
+                </select>
+            </div>
+            <div class="pager-nav">
+                <button type="button" class="btn-plain" disabled="@(!_page.HasPrevious)" @onclick="() => GoToPageAsync(1)">« First</button>
+                <button type="button" class="btn-plain" disabled="@(!_page.HasPrevious)" @onclick="() => GoToPageAsync(_page.Page - 1)">‹ Prev</button>
+                <span class="pager-status">Page @_page.Page of @_page.TotalPages</span>
+                <button type="button" class="btn-plain" disabled="@(!_page.HasNext)" @onclick="() => GoToPageAsync(_page.Page + 1)">Next ›</button>
+                <button type="button" class="btn-plain" disabled="@(!_page.HasNext)" @onclick="() => GoToPageAsync(_page.TotalPages)">Last »</button>
+            </div>
+        </nav>
     }
 </div>
 
@@ -152,7 +172,9 @@
 
 @code {
     private IReadOnlyList<CategoryItem> _categories = [];
-    private List<TransactionListItem>? _items;
+    private TransactionPage? _page;
+    private int _pageNumber = 1;
+    private int _pageSize = TransactionPage.DefaultPageSize;
 
     private DateOnly? _from;
     private DateOnly? _to;
@@ -170,12 +192,6 @@
     private string? _deleteError;
     private bool _deletingBusy;
 
-    private decimal FilteredIncome =>
-        _items?.Where(t => t.Type == TransactionType.Income).Sum(t => t.Amount) ?? 0m;
-
-    private decimal FilteredExpenses =>
-        _items?.Where(t => t.Type == TransactionType.Expense).Sum(t => t.Amount) ?? 0m;
-
     private string? DeleteMessage => _deleting is { } t
         ? $"This permanently removes \"{t.Description}\" ({Fmt.SignedMoney(t.Amount, t.Type)}) from {Fmt.Date(t.Date)}."
         : null;
@@ -186,7 +202,10 @@
         await ReloadAsync();
     }
 
-    private async Task ReloadAsync()
+    /// <summary>Filter or sort changes restart from page 1; edits and deletes keep the current page.</summary>
+    private Task ReloadAsync() => LoadPageAsync(1);
+
+    private async Task LoadPageAsync(int pageNumber)
     {
         var filter = new TransactionFilter(
             From: _from,
@@ -194,9 +213,17 @@
             CategoryId: int.TryParse(_categoryFilter, out var categoryId) ? categoryId : null,
             Type: Enum.TryParse<TransactionType>(_typeFilter, out var type) ? type : null,
             Sort: _sort,
-            Descending: _desc);
-        _items = await Tx.GetAsync(filter);
+            Descending: _desc,
+            Page: pageNumber,
+            PageSize: _pageSize);
+        _page = await Tx.GetAsync(filter);
+        // The service clamps out-of-range pages (e.g. after the last row on a page is deleted).
+        _pageNumber = _page.Page;
     }
+
+    private Task GoToPageAsync(int pageNumber) => LoadPageAsync(pageNumber);
+
+    private Task PageSizeChangedAsync() => LoadPageAsync(1);
 
     private async Task SortByAsync(TransactionSort column)
     {
@@ -280,7 +307,7 @@
             }
 
             CloseEditor();
-            await ReloadAsync();
+            await LoadPageAsync(_pageNumber);
         }
         finally
         {
@@ -312,7 +339,7 @@
             }
 
             _deleting = null;
-            await ReloadAsync();
+            await LoadPageAsync(_pageNumber);
         }
         finally
         {

@@ -550,6 +550,49 @@ a.btn-accent:hover, a.btn-plain:hover {
     color: var(--text-muted);
 }
 
+.pager {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 16px;
+    flex-wrap: wrap;
+    margin-top: 14px;
+    padding-top: 12px;
+    border-top: 1px solid var(--border);
+}
+
+.pager-size {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-size: 13px;
+    color: var(--text-muted);
+}
+
+.pager-size > .input-control {
+    padding-top: 6px;
+    padding-bottom: 6px;
+}
+
+.pager-nav {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    flex-wrap: wrap;
+}
+
+.pager-nav > .btn-plain {
+    padding: 6px 12px;
+    font-size: 13px;
+}
+
+.pager-status {
+    font-size: 13px;
+    color: var(--text-muted);
+    padding: 0 8px;
+    white-space: nowrap;
+}
+
 .empty-state {
     text-align: center;
     color: var(--text-muted);

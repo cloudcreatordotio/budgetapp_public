@@ -21,7 +21,42 @@ public sealed record TransactionFilter(
     int? CategoryId = null,
     TransactionType? Type = null,
     TransactionSort Sort = TransactionSort.Date,
-    bool Descending = true);
+    bool Descending = true,
+    int Page = 1,
+    int PageSize = TransactionPage.DefaultPageSize);
+
+/// <summary>
+/// One page of a filtered transaction list. Totals cover every row that matches the
+/// filter, not just the rows on this page, so the footer stays truthful while paging.
+/// </summary>
+public sealed record TransactionPage(
+    IReadOnlyList<TransactionListItem> Items,
+    int Page,
+    int PageSize,
+    int TotalCount,
+    decimal IncomeTotal,
+    decimal ExpenseTotal)
+{
+    public const int DefaultPageSize = 50;
+    public const int MaxPageSize = 200;
+    public static readonly int[] PageSizes = [25, 50, 100, 200];
+
+    public int TotalPages => TotalCount == 0 ? 1 : (TotalCount + PageSize - 1) / PageSize;
+    public bool HasPrevious => Page > 1;
+    public bool HasNext => Page < TotalPages;
+    public int FirstIndex => TotalCount == 0 ? 0 : (Page - 1) * PageSize + 1;
+    public int LastIndex => TotalCount == 0 ? 0 : Math.Min(Page * PageSize, TotalCount);
+
+    /// <summary>Clamps a requested page size into the range the service is willing to serve.</summary>
+    public static int ClampPageSize(int pageSize) => Math.Clamp(pageSize, 1, MaxPageSize);
+
+    /// <summary>Clamps a requested page so an out-of-range page (e.g. after deletes) still returns rows.</summary>
+    public static int ClampPage(int page, int totalCount, int pageSize)
+    {
+        var totalPages = totalCount == 0 ? 1 : (totalCount + pageSize - 1) / pageSize;
+        return Math.Clamp(page, 1, totalPages);
+    }
+}
 
 public sealed record TransactionListItem(
     int Id,
@@ -64,12 +99,47 @@ public sealed class TransactionService(
     IDbContextFactory<BudgetDbContext> dbFactory,
     ICurrentUserService currentUser)
 {
-    public async Task<List<TransactionListItem>> GetAsync(TransactionFilter filter, CancellationToken ct = default)
+    /// <summary>
+    /// Returns one page of the user's transactions. Only the requested page is materialised;
+    /// the count and income/expense totals are aggregated in the database so the result stays
+    /// bounded no matter how many transactions the user has logged.
+    /// </summary>
+    public async Task<TransactionPage> GetAsync(TransactionFilter filter, CancellationToken ct = default)
     {
         var userId = await currentUser.GetRequiredUserIdAsync(ct);
         await using var db = await dbFactory.CreateDbContextAsync(ct);
 
-        var query = db.Transactions.AsNoTracking().Where(t => t.UserId == userId);
+        var query = ApplyFilter(db.Transactions.AsNoTracking().Where(t => t.UserId == userId), filter);
+
+        var totals = await query
+            .GroupBy(_ => 1)
+            .Select(g => new
+            {
+                Count = g.Count(),
+                Income = g.Where(t => t.Type == TransactionType.Income).Sum(t => t.Amount),
+                Expenses = g.Where(t => t.Type == TransactionType.Expense).Sum(t => t.Amount),
+            })
+            .SingleOrDefaultAsync(ct);
+
+        var totalCount = totals?.Count ?? 0;
+        var pageSize = TransactionPage.ClampPageSize(filter.PageSize);
+        var page = TransactionPage.ClampPage(filter.Page, totalCount, pageSize);
+
+        var items = totalCount == 0
+            ? []
+            : await ApplySort(query, filter)
+                .Skip((page - 1) * pageSize)
+                .Take(pageSize)
+                .Select(t => new TransactionListItem(
+                    t.Id, t.Date, t.Description, t.Merchant, t.Amount, t.Type,
+                    t.CategoryId, t.Category.Name, t.Category.ColorHex))
+                .ToListAsync(ct);
+
+        return new TransactionPage(items, page, pageSize, totalCount, totals?.Income ?? 0m, totals?.Expenses ?? 0m);
+    }
+
+    private static IQueryable<Transaction> ApplyFilter(IQueryable<Transaction> query, TransactionFilter filter)
+    {
         if (filter.From is { } from)
         {
             query = query.Where(t => t.Date >= from);
@@ -90,11 +160,7 @@ public sealed class TransactionService(
             query = query.Where(t => t.Type == type);
         }
 
-        return await ApplySort(query, filter)
-            .Select(t => new TransactionListItem(
-                t.Id, t.Date, t.Description, t.Merchant, t.Amount, t.Type,
-                t.CategoryId, t.Category.Name, t.Category.ColorHex))
-            .ToListAsync(ct);
+        return query;
     }
 
     public async Task<ServiceResult> CreateAsync(TransactionInput input, CancellationToken ct = default)
